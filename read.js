@@ -1,49 +1,72 @@
-var textract = require('textract');
-var natural = require('natural');
+//Headers to import required libraries
 var fs = require('fs');
-var readme;
-var perfect;
-var arr;
-var key;
+var natural = require('natural');
+var tokenizer = new natural.WordTokenizer();
+var WordPOS = require('wordpos'),
+wordpos = new WordPOS();
 
-function read() {
-	var readme;
-	textract.fromFileWithPath('Anish_htmlCss960.docx', function (error, text) {
-		if (error) {
-			console.log("Error");
-		} else {
-			readme = text;
-		}
-		var tokenizer = new natural.WordTokenizer();
-		arr = tokenizer.tokenize(readme);
-	})
-	var perfect;
-	textract.fromFileWithPath('Lokesh_HTML,CSS,960 Grid.docx', function (error, text) {
-		if (error) {
-			console.log("Error");
-		} else {
-			perfect = text;
-		}
-		var tokenizer = new natural.WordTokenizer();
-		key = tokenizer.tokenize(perfect);
-	})
-	setTimeout(function(){length(arr, key);},2000);
+//Document to be compare
+var evalDocument = fs.readFileSync('toCompare.txt','utf-8');
+//perfect document
+var standardDocument = fs.readFileSync('perfect.txt','utf-8');
+
+//Tokenizing both the documents
+var standardTokens = tokenizer.tokenize(standardDocument);
+var evalTokens = tokenizer.tokenize(evalDocument);
+//setting word count range based on number of words in perfect document
+var range = (standardTokens.length*20)/100
+//evaluating the length of both documents
+var standardLength = standardTokens.length;
+var evalLength = evalTokens.length;
+
+if(evalLength <= standardLength-range || evalLength >= standardLength+range){
+  console.log("Word count not in the specified range");
+    return;
 }
 
-function length(arr, key) {
-	console.log(arr.length);
-	console.log(key.length);
-	var per_len = key.length;
-	var range = (per_len*20)/100;
-	console.log(range);
-	if((per_len - range) <= arr.length && arr.length <= (per_len + range))
-		compare(arr,key);
-	else
-		console.log("Error");
-}
+//global variables
+var evalNouns;
+var standardNouns;
+var similarNouns = [];
+//Extracting nouns from both documents
+wordpos.getNouns(evalDocument, function(result){
+  evalNouns = result;
+  
+  wordpos.getNouns(standardDocument, function(output){
+    standardNouns = output;
+    compare();
+    })
+});
 
-function compare(arr,key){
-	
-}
+//Noun comparision
+function compare(){
+  var corpus = standardNouns;
+  var spellcheck = new natural.Spellcheck(corpus);
+  for(let i = 0; i < evalNouns.length; i++){
+    if(spellcheck.isCorrect(evalNouns[i])){
+        similarNouns.push(evalNouns[i]);
+    }
+}   
+    end();
+} 
 
-read();
+//Creating JSON file
+ function end(){
+    var score = {
+      Standard : 
+        {
+          wordCount : standardLength,
+          nouns : standardNouns.length
+        }, 
+
+      Eval : 
+        {
+          wordCount : evalLength,
+          nouns : evalNouns.length,
+          commonNouns : similarNouns.length
+        }
+    }
+  var json = JSON.stringify(score, null, 2);
+  fs.writeFileSync('output.json',json)
+     console.log(score);
+ }

@@ -2,19 +2,35 @@
 var fs = require('fs');
 var natural = require('natural');
 var tokenizer = new natural.WordTokenizer();
-var WordPOS = require('wordpos'),
-wordpos = new WordPOS();
+var path=require("path");
+var perfetDoc="perfect.txt";
+var imperfectDoc="toCompare.txt";
+var length=20;
+
+//global variables
+var similarNouns = [];
+var evalNouns=[];
+var standardNouns=[];
+var base_folder = path.join(path.dirname(require.resolve("natural")), "brill_pos_tagger");
+var rulesFilename = base_folder + "/data/English/tr_from_posjs.txt";
+var lexiconFilename = base_folder + "/data/English/lexicon_from_posjs.json";
+var defaultCategory = 'N';
+ 
+var lexicon = new natural.Lexicon(lexiconFilename, defaultCategory);
+var rules = new natural.RuleSet(rulesFilename);
+var tagger = new natural.BrillPOSTagger(lexicon, rules);
+
 
 //Document to be compare
-var evalDocument = fs.readFileSync('toCompare.txt','utf-8');
+var evalDocument = fs.readFileSync(imperfectDoc,'utf-8');
 //perfect document
-var standardDocument = fs.readFileSync('perfect.txt','utf-8');
+var standardDocument = fs.readFileSync(perfetDoc,'utf-8');
 
 //Tokenizing both the documents
 var standardTokens = tokenizer.tokenize(standardDocument);
 var evalTokens = tokenizer.tokenize(evalDocument);
 //setting word count range based on number of words in perfect document
-var range = (standardTokens.length*20)/100
+var range = (standardTokens.length*length)/100
 //evaluating the length of both documents
 var standardLength = standardTokens.length;
 var evalLength = evalTokens.length;
@@ -23,20 +39,24 @@ if(evalLength <= standardLength-range || evalLength >= standardLength+range){
   console.log("Word count not in the specified range");
     return;
 }
+else{
+	getNoun(standardTokens,standardNouns);
+	getNoun(evalTokens,evalNouns);
+			compare();
 
-//global variables
-var evalNouns;
-var standardNouns;
-var similarNouns = [];
+}
+
 //Extracting nouns from both documents
-wordpos.getNouns(evalDocument, function(result){
-  evalNouns = result;
+function getNoun(document,addNoun){
+	var documentTagged = tagger.tag(document);
   
-  wordpos.getNouns(standardDocument, function(output){
-    standardNouns = output;
-    compare();
-    })
-});
+	
+	for(var i=0; i < documentTagged.length; i++){ 
+    //Extracting nouns from document
+    if(documentTagged[i][1] == "NN"|"NNS"|"NNP"|"NNPS")
+      addNoun.push(documentTagged[i][0]);
+	}	
+}
 
 //Noun comparision
 function compare(){
